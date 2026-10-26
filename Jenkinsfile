@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+    environment {
+        APP_KEY = credentials('laravel-app-key')
+        DB_PASSWORD = credentials('laravel-db-password')
+        MYSQL_ROOT_PASSWORD = credentials('laravel-mysql-root-password')
+    }
+
     options {
         timestamps()
         disableConcurrentBuilds()
@@ -21,9 +27,7 @@ pipeline {
 
         stage('Deploy Application') {
             steps {
-                sh '''
-                    docker compose up -d
-                '''
+                sh 'docker compose up -d'
             }
         }
 
@@ -40,9 +44,15 @@ pipeline {
             steps {
                 sh '''
                     set -e
+
+                    echo "Checking running containers..."
                     docker compose ps
+
+                    echo "Checking Laravel..."
                     docker compose exec -T app \
                         php artisan --version
+
+                    echo "Checking application HTTP response..."
 
                     for i in $(seq 1 20); do
                         if curl -fsS http://localhost:8000/ \
@@ -50,6 +60,7 @@ pipeline {
                             echo "SUCCESS: Laravel is accessible."
                             exit 0
                         fi
+
                         sleep 3
                     done
 
@@ -63,10 +74,17 @@ pipeline {
 
     post {
         success {
-            echo 'CI/CD pipeline completed successfully.'
+            echo 'SUCCESS: Laravel CI/CD pipeline completed.'
+            echo 'Application URL: http://localhost:8000'
         }
+
         failure {
-            echo 'Pipeline failed. Check the Jenkins console output.'
+            echo 'FAILED: Check the Jenkins Console Output.'
+        }
+
+        always {
+            echo 'Pipeline execution finished.'
         }
     }
 }
+
